@@ -1,0 +1,47 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install Tesseract
+        run: sudo apt-get update && sudo apt-get install -y tesseract-ocr
+      - name: Install project
+        run: pip install -e ".[dev]"
+      - name: Lint
+        run: |
+          ruff check app tools eval tests
+          ruff format --check app tools eval tests
+      - name: Tests
+        run: pytest -q
+      - name: Evaluation on a small dataset
+        run: |
+          python -m tools.synth.generate --n 60 --out data/synth --seed 42
+          python -m eval.run_eval --data data/synth --report eval-report-ci.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eval-report
+          path: eval-report-ci.md
+
+  secrets-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

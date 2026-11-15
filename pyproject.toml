@@ -1,0 +1,33 @@
+[project]
+name = "invoicelens"
+version = "0.1.0"
+description = "Invoice intake pipeline: OCR, extraction, validation, measured accuracy."
+requires-python = ">=3.11"
+dependencies = [
+    "pdfplumber>=0.11",
+    "pytesseract>=0.3.10",
+    "pillow>=10",
+    "numpy>=1.26",
+    "reportlab>=4",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.5", "pre-commit>=3"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*", "tools*", "eval*"]
