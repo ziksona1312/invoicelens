@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import difflib
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
@@ -26,6 +27,9 @@ class Context:
     known_vendors: set[str]
     today: date = field(default_factory=date.today)
     seen: set[tuple[str, str]] = field(default_factory=set)
+    # Optional shared store for duplicates (the service uses PostgreSQL). Returns True when this
+    # document is the first one with that key, False when another document already owns it.
+    claim_key: Callable[[tuple[str, str]], bool] | None = None
 
 
 def is_known_vendor(vendor: str, known: set[str]) -> bool:
@@ -72,8 +76,12 @@ def check(ex: Extracted, ctx: Context) -> list[str]:
 
     if ex.vendor and ex.invoice_number:
         key = (normalize_vendor(ex.vendor), ex.invoice_number)
-        if key in ctx.seen:
-            reasons.append("duplicate")
-        ctx.seen.add(key)
+        if ctx.claim_key is not None:
+            if not ctx.claim_key(key):
+                reasons.append("duplicate")
+        else:
+            if key in ctx.seen:
+                reasons.append("duplicate")
+            ctx.seen.add(key)
 
     return reasons

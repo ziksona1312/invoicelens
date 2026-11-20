@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>InvoiceLens review queue</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; color: #1f2328; }
+    h1 { margin-bottom: .25rem; }
+    .muted { color: #59636e; }
+    table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
+    th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid #d1d9e0; vertical-align: top; }
+    th { background: #f6f8fa; }
+    .reason { display: inline-block; background: #fff8c5; border: 1px solid #d4a72c; border-radius: 4px;
+              padding: 0 .35rem; margin: 0 .25rem .25rem 0; font-size: .85rem; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    form { display: inline; }
+    button { cursor: pointer; padding: .3rem .7rem; border-radius: 4px; border: 1px solid #d1d9e0; }
+    .approve { background: #dafbe1; } .reject { background: #ffebe9; }
+  </style>
+</head>
+<body>
+  <h1>Review queue</h1>
+  <p class="muted">{{ docs|length }} invoice(s) need a person. Counts: {% for s, n in counts.items() %}{{ s }} {{ n }}{% if not loop.last %} · {% endif %}{% endfor %}</p>
+  {% if docs %}
+  <table>
+    <tr><th>Received</th><th>Vendor</th><th>Invoice</th><th>Date</th><th class="num">Total</th><th>Why</th><th></th></tr>
+    {% for d in docs %}
+    {% set x = d.extracted or {} %}
+    <tr>
+      <td>{{ d.created_at.strftime('%Y-%m-%d %H:%M') }}<br><span class="muted">{{ d.filename }} · {{ d.source }}</span></td>
+      <td>{{ x.vendor or '?' }}</td>
+      <td>{{ x.invoice_number or '?' }}</td>
+      <td>{{ x.date or '?' }}</td>
+      <td class="num">{{ '%.2f'|format(x.total) if x.total is not none else '?' }} {{ x.currency or '' }}</td>
+      <td>{% for r in d.reasons %}<span class="reason">{{ r }}</span>{% endfor %}</td>
+      <td>
+        <form method="post" action="/ui/review/{{ d.id }}"><input type="hidden" name="action" value="approve"><button class="approve">Approve</button></form>
+        <form method="post" action="/ui/review/{{ d.id }}"><input type="hidden" name="action" value="reject"><button class="reject">Reject</button></form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p>Nothing to review.</p>
+  {% endif %}
+</body>
+</html>

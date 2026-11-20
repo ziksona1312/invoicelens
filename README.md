@@ -55,10 +55,44 @@ make test      # unit + end-to-end tests
 make demo      # generate 300 invoices and write eval/report.md
 ```
 
+## Run it as a service
+
+The same pipeline runs behind an API, with a job queue, workers and a review page.
+
+```mermaid
+flowchart LR
+    C[Client] -- "POST /documents" --> API[FastAPI]
+    API -- PDF --> S3[(Object storage<br/>S3 API, SeaweedFS)]
+    API -- row --> PG[(PostgreSQL)]
+    API -- job --> R[(Redis queue)]
+    R --> W[Workers x2<br/>OCR + rules]
+    W --> S3
+    W -- decision --> PG
+    P[Person] -- "/review" --> API
+```
+
+Requires Docker (Docker Desktop with WSL integration works).
+
+```bash
+make up        # builds the image and starts api, 2 workers, postgres, redis, storage
+make data      # generate invoices (once)
+make load      # upload 50 invoices and compare decisions with ground truth
+make logs      # JSON logs from api and workers
+make down
+```
+
+- API docs: http://localhost:8000/docs
+- Review queue: http://localhost:8000/review
+- Health and metrics: `/healthz`, `/metrics` (Prometheus format)
+
+Design: [ADR 0003](docs/adr/0003-service-architecture.md) (idempotent uploads, duplicate
+detection across workers, retries and a dead-letter queue) and
+[ADR 0004](docs/adr/0004-object-storage-seaweedfs.md) (why SeaweedFS instead of MinIO).
+
 ## Roadmap
 
 - [x] Core: generator, extraction, validation, evaluation, CI
-- [ ] Service: FastAPI + Redis worker + PostgreSQL + MinIO, review queue
+- [x] Service: FastAPI + Redis/RQ workers + PostgreSQL + S3 storage, review queue
 - [ ] Docker images on GHCR, security scans
 - [ ] Ansible: provision an Ubuntu VM (hardening, Docker, backups), Molecule tests
 - [ ] Terraform: deploy the stack (dev/staging), plan on pull requests
@@ -69,3 +103,5 @@ make demo      # generate 300 invoices and write eval/report.md
 
 - [ADR 0001: Rules first, measured against ground truth](docs/adr/0001-rules-before-ml.md)
 - [ADR 0002: OCR preprocessing](docs/adr/0002-ocr-preprocessing.md)
+- [ADR 0003: Service architecture](docs/adr/0003-service-architecture.md)
+- [ADR 0004: SeaweedFS instead of MinIO](docs/adr/0004-object-storage-seaweedfs.md)

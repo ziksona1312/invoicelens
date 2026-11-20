@@ -11,6 +11,25 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: invoicelens
+          POSTGRES_PASSWORD: invoicelens
+          POSTGRES_DB: invoicelens_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U invoicelens" --health-interval 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://invoicelens:invoicelens@localhost:5432/invoicelens_test
+      REDIS_URL: redis://localhost:6379/15
+      REQUIRE_SERVICES: "1"  # fail instead of silently skipping the service tests
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -20,13 +39,13 @@ jobs:
       - name: Install Tesseract
         run: sudo apt-get update && sudo apt-get install -y tesseract-ocr
       - name: Install project
-        run: pip install -e ".[dev]"
+        run: pip install -e ".[dev,service]"
       - name: Lint
         run: |
           ruff check app tools eval tests
           ruff format --check app tools eval tests
-      - name: Tests
-        run: pytest -q
+      - name: Tests (service tests run against the Postgres and Redis containers above)
+        run: pytest -q -rs
       - name: Evaluation on a small dataset
         run: |
           python -m tools.synth.generate --n 60 --out data/synth --seed 42
@@ -35,6 +54,17 @@ jobs:
         with:
           name: eval-report
           path: eval-report-ci.md
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate docker-compose.yml
+        run: cp .env.example .env && docker compose config -q
+      - name: Build image
+        run: docker build -t invoicelens:ci .
+      - name: Smoke test (the worker module imports inside the image)
+        run: docker run --rm invoicelens:ci python -c "import app.service.api, app.service.worker; print('ok')"
 
   secrets-scan:
     runs-on: ubuntu-latest

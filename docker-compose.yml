@@ -1,0 +1,75 @@
+# Local stack: docker compose up --build
+# API http://localhost:8000/docs · review page http://localhost:8000/review
+
+x-app: &app
+  build: .
+  image: invoicelens:local
+  restart: unless-stopped
+  environment:
+    DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    REDIS_URL: redis://redis:6379/0
+    S3_ENDPOINT_URL: http://storage:8333
+    S3_BUCKET: ${S3_BUCKET:-invoices}
+    AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+    AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+    LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  depends_on:
+    postgres: { condition: service_healthy }
+    redis: { condition: service_healthy }
+    storage: { condition: service_healthy }
+
+services:
+  api:
+    <<: *app
+    ports: ["8000:8000"]
+
+  worker:
+    <<: *app
+    command: ["python", "-m", "app.service.worker"]
+    healthcheck: { disable: true }
+    deploy:
+      replicas: ${WORKER_REPLICAS:-2}
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes: [redisdata:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+
+  storage:
+    # SeaweedFS: master + volume + filer + S3 gateway in one container (see docs/adr/0004).
+    image: chrislusf/seaweedfs:4.54
+    restart: unless-stopped
+    command: ["server", "-ip.bind=0.0.0.0", "-dir=/data", "-s3", "-s3.port=8333", "-master.volumeSizeLimitMB=1024"]
+    environment:
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+    volumes: [s3data:/data]
+    healthcheck:
+      # Any HTTP answer from the S3 gateway (even 403 without credentials) means it is up.
+      test: ["CMD-SHELL", "wget -q -S -O /dev/null http://127.0.0.1:8333/ 2>&1 | grep -q 'HTTP/'"]
+      interval: 5s
+      retries: 20
+      start_period: 10s
+
+volumes:
+  pgdata:
+  redisdata:
+  s3data:

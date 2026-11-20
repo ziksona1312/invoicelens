@@ -11,3 +11,4 @@ data/
 .env
 *.vault
 *.egg-info/
+dump.rdb
