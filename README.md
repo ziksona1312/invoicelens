@@ -1,6 +1,7 @@
 # InvoiceLens
 
 ![ci](https://github.com/ziksona1312/invoicelens/actions/workflows/ci.yml/badge.svg)
+![release](https://github.com/ziksona1312/invoicelens/actions/workflows/release.yml/badge.svg)
 
 Invoice intake pipeline: read a PDF (text layer or OCR), extract the fields, check them against
 business rules, and decide **approve**, **review** or **reject**. Accuracy is measured against
@@ -51,6 +52,7 @@ Requires Python 3.11+ and Tesseract (`sudo apt install tesseract-ocr`). On Windo
 
 ```bash
 make install && source .venv/bin/activate
+make lint      # ruff + mypy
 make test      # unit + end-to-end tests
 make demo      # generate 300 invoices and write eval/report.md
 ```
@@ -85,6 +87,12 @@ make down
 - Review queue: http://localhost:8000/review
 - Health and metrics: `/healthz`, `/metrics` (Prometheus format)
 
+Run a published release instead of a local build:
+
+```bash
+IMAGE=ghcr.io/ziksona1312/invoicelens:latest docker compose up -d --no-build
+```
+
 Design: [ADR 0003](docs/adr/0003-service-architecture.md) (idempotent uploads, duplicate
 detection across workers, retries and a dead-letter queue) and
 [ADR 0004](docs/adr/0004-object-storage-seaweedfs.md) (why SeaweedFS instead of MinIO).
@@ -93,7 +101,7 @@ detection across workers, retries and a dead-letter queue) and
 
 - [x] Core: generator, extraction, validation, evaluation, CI
 - [x] Service: FastAPI + Redis/RQ workers + PostgreSQL + S3 storage, review queue
-- [ ] Docker images on GHCR, security scans
+- [x] CI/CD: images on GHCR with SBOM, Trivy gate, SHA-pinned actions, Dependabot, protected `main`
 - [ ] Ansible: provision an Ubuntu VM (hardening, Docker, backups), Molecule tests
 - [ ] Terraform: deploy the stack (dev/staging), plan on pull requests
 - [ ] Monitoring (Prometheus + Grafana) and a measured backup restore
@@ -105,3 +113,4 @@ detection across workers, retries and a dead-letter queue) and
 - [ADR 0002: OCR preprocessing](docs/adr/0002-ocr-preprocessing.md)
 - [ADR 0003: Service architecture](docs/adr/0003-service-architecture.md)
 - [ADR 0004: SeaweedFS instead of MinIO](docs/adr/0004-object-storage-seaweedfs.md)
+- [ADR 0005: CI/CD and supply-chain security](docs/adr/0005-ci-cd-and-supply-chain.md)

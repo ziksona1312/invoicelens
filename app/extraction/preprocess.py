@@ -25,5 +25,5 @@ def estimate_skew(gray: Image.Image, limit: float = 3.0, step: float = 0.5) -> f
 
 def prepare_for_ocr(image: Image.Image) -> Image.Image:
     gray = ImageOps.autocontrast(image.convert("L"))
-    gray = gray.rotate(estimate_skew(gray), resample=Image.BICUBIC, fillcolor=255)
+    gray = gray.rotate(estimate_skew(gray), resample=Image.Resampling.BICUBIC, fillcolor=255)
     return gray.filter(ImageFilter.MedianFilter(3))  # removes speckle noise

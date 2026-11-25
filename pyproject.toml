@@ -1,6 +1,6 @@
 [project]
 name = "invoicelens"
-version = "0.1.0"
+version = "0.3.0"
 description = "Invoice intake pipeline: OCR, extraction, validation, measured accuracy."
 requires-python = ">=3.11"
 dependencies = [
@@ -24,11 +24,24 @@ service = [
     "boto3>=1.35",
     "prometheus-client>=0.21",
 ]
-dev = ["pytest>=8", "ruff>=0.5", "pre-commit>=3", "httpx>=0.27", "moto[s3]>=5"]
+dev = [
+    "pytest>=8",
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "pre-commit>=3",
+    "httpx>=0.27",  # tools/load_demo.py
+    "httpx2>=2",  # starlette TestClient
+    "moto[s3]>=5",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+warn_unused_ignores = true
 
 [tool.ruff]
 line-length = 100
