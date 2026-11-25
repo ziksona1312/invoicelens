@@ -11,8 +11,9 @@ help:
 install: ## Create .venv and install the project with dev + service tools
 	$(PY) -m venv .venv && .venv/bin/pip install -e ".[dev,service]" && .venv/bin/pre-commit install || true
 
-lint: ## Ruff lint + format check
+lint: ## Ruff lint + format check + mypy type check
 	ruff check app tools eval tests && ruff format --check app tools eval tests
+	mypy app tools eval
 
 test: ## Unit + end-to-end tests
 	$(PY) -m pytest -q

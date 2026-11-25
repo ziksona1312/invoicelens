@@ -8,6 +8,9 @@ on:
 permissions:
   contents: read
 
+# Every third-party action is pinned to a full commit SHA (the tag is only a comment).
+# A tag can be moved to malicious code; a commit SHA cannot. See docs/adr/0005.
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -31,8 +34,10 @@ jobs:
       REDIS_URL: redis://localhost:6379/15
       REQUIRE_SERVICES: "1"  # fail instead of silently skipping the service tests
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
           cache: pip
@@ -40,17 +45,18 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y tesseract-ocr
       - name: Install project
         run: pip install -e ".[dev,service]"
-      - name: Lint
+      - name: Lint and type check
         run: |
           ruff check app tools eval tests
           ruff format --check app tools eval tests
+          mypy app tools eval
       - name: Tests (service tests run against the Postgres and Redis containers above)
         run: pytest -q -rs
       - name: Evaluation on a small dataset
         run: |
           python -m tools.synth.generate --n 60 --out data/synth --seed 42
           python -m eval.run_eval --data data/synth --report eval-report-ci.md
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: eval-report
           path: eval-report-ci.md
@@ -58,21 +64,46 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Validate docker-compose.yml
         run: cp .env.example .env && docker compose config -q
       - name: Build image
         run: docker build -t invoicelens:ci .
-      - name: Smoke test (the worker module imports inside the image)
+      - name: Smoke test (the API and worker modules import inside the image)
         run: docker run --rm invoicelens:ci python -c "import app.service.api, app.service.worker; print('ok')"
+      - name: Vulnerability report (HIGH and CRITICAL, informational)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: invoicelens:ci
+          severity: HIGH,CRITICAL
+          format: table
+          exit-code: "0"
+      - name: Vulnerability gate (fail on CRITICAL that has a fix)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: invoicelens:ci
+          severity: CRITICAL
+          ignore-unfixed: true
+          format: table
+          exit-code: "1"
+          skip-setup-trivy: true  # already installed by the step above
 
   secrets-scan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
       - name: Scan full git history for secrets
+        env:
+          VERSION: 8.24.3
+          SHA256: 9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c
         run: |
-          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz | tar xz gitleaks
+          curl -sSfL -o gitleaks.tgz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz"
+          echo "${SHA256}  gitleaks.tgz" | sha256sum -c -
+          tar xzf gitleaks.tgz gitleaks
           ./gitleaks git --redact -v .

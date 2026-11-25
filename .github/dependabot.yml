@@ -1,0 +1,27 @@
+# Weekly dependency updates as pull requests. CI must pass before any of them can be merged.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    groups:
+      actions: { patterns: ["*"] }
+
+  - package-ecosystem: pip
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    groups:
+      python-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: docker
+    directory: /
+    schedule: { interval: weekly, day: monday }
+
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule: { interval: weekly, day: monday }
+
+  - package-ecosystem: pre-commit
+    directory: /
+    schedule: { interval: monthly }

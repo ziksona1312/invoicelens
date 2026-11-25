@@ -123,7 +123,7 @@ def add_days(iso: str, days: int) -> str:
 # ---------------------------------------------------------------- invoice data
 def build_invoice(rng: random.Random, idx: int, locale: str, template: str) -> dict:
     n_lines = rng.randint(1, 6)
-    lines = []
+    lines: list[dict] = []
     for desc in rng.sample(ITEMS[locale], n_lines):
         qty = rng.randint(1, 20)
         unit = round(rng.uniform(5, 900), 2)
@@ -351,7 +351,9 @@ def degrade(pdf_bytes: bytes, level: str, rng: np.random.Generator) -> tuple[Ima
     with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
         img = pdf.pages[0].to_image(resolution=dpi).original.convert("RGB")
     angle = float(rng.uniform(-0.6, 0.6) if level == "scanned" else rng.uniform(-2.5, 2.5))
-    img = img.rotate(angle, resample=Image.BICUBIC, expand=False, fillcolor=(255, 255, 255))
+    img = img.rotate(
+        angle, resample=Image.Resampling.BICUBIC, expand=False, fillcolor=(255, 255, 255)
+    )
     img = img.filter(ImageFilter.GaussianBlur(0.4 if level == "scanned" else 1.0))
     if level == "degraded":
         img = ImageEnhance.Contrast(img).enhance(0.75)
